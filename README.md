@@ -9,6 +9,8 @@ DeepSleep is the open-source background agent for local models.
 
 It gives developers a `ds` workflow, a compact 3-layer memory file, and idle-time "dreaming" that summarizes recent work while they are away.
 
+It is positioned for developers looking for an open-source AI coding agent, a local-LLM developer tool, a terminal copilot, or a Claude Code alternative that runs on Ollama instead of a hosted API.
+
 It is written from scratch and safe to publish. The architecture is inspired by the broader always-on agent pattern, not copied from leaked source code or source maps.
 
 ## Why it lands fast
@@ -28,6 +30,18 @@ You initialize a repo once, ask natural questions in the terminal, and let DeepS
 - `Idle-time dreaming`: watches your repo and summarizes after inactivity
 - `3-layer memory`: `project`, `session`, and `ephemeral`
 - `Terminal-native`: hacker-style interactive UI with file completion
+
+## Search-friendly positioning
+
+DeepSleep is best described as:
+
+- an open-source AI coding agent
+- a local AI developer tool
+- a background agent for codebases
+- a terminal copilot for Ollama
+- a local-model alternative to hosted coding assistants
+
+If people are searching for phrases like `open source claude code alternative`, `local ai coding agent`, `ollama coding assistant`, or `background agent for developers`, this is the category DeepSleep belongs in.
 
 ## Quick demo
 

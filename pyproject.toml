@@ -15,13 +15,17 @@ authors = [
 ]
 keywords = [
   "agent",
+  "ai-agent",
   "cli",
+  "coding-agent",
   "ollama",
   "deepseek",
   "watchdog",
   "memory",
   "developer-tools",
-  "local-ai"
+  "local-ai",
+  "local-llm",
+  "terminal-ai"
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
