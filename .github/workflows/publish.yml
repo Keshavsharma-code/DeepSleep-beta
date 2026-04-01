@@ -1,6 +1,9 @@
 name: Publish
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
   release:
     types:
@@ -9,6 +12,7 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: pypi
     permissions:
       id-token: write
 
