@@ -1,5 +1,10 @@
 # DeepSleep-bets
 
+[![PyPI version](https://img.shields.io/pypi/v/deepsleep-ai.svg)](https://pypi.org/project/deepsleep-ai/)
+[![Python versions](https://img.shields.io/pypi/pyversions/deepsleep-ai.svg)](https://pypi.org/project/deepsleep-ai/)
+[![CI](https://github.com/Keshavsharma-code/DeepSleep-beta/actions/workflows/ci.yml/badge.svg)](https://github.com/Keshavsharma-code/DeepSleep-beta/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+
 DeepSleep is the open-source background agent for local models.
 
 It gives developers a `ds` workflow, a compact 3-layer memory file, and idle-time "dreaming" that summarizes recent work while they are away.
@@ -42,7 +47,7 @@ Refactor src/deepsleep_ai/cli.py
 Summarize the recent changes
 ```
 
-## The leaked-spec hook, done safely
+## 3-layer memory architecture
 
 DeepSleep explicitly implements a 3-layer memory stack:
 
@@ -79,6 +84,13 @@ That is what makes `What was I doing?` feel instant the next time you open the p
 pip install deepsleep-ai
 ```
 
+Quick check:
+
+```bash
+ds --version
+ds doctor
+```
+
 ### Local development
 
 ```bash
@@ -105,6 +117,14 @@ ds dream --idle-seconds 300
 ds status
 ds doctor
 ```
+
+## Why it feels real
+
+- installs directly from PyPI
+- keeps memory deterministic and compact
+- works with local models through Ollama
+- degrades gracefully when Ollama is offline
+- ships CI, tests, and a release workflow
 
 ## First-run workflow
 
@@ -180,12 +200,14 @@ The MVP is centered on these four files:
 - MIT license
 - GitHub Actions CI
 - tests for memory compaction, watcher behavior, offline fallback, and chat exit flow
+- live PyPI package: [deepsleep-ai](https://pypi.org/project/deepsleep-ai/)
 
 ## Self-test
 
 ```bash
 pytest -q
 python -m deepsleep_ai --help
+python -m build --no-isolation
 ```
 
 ## Launch kit
@@ -201,4 +223,4 @@ If you want this repo to travel, keep the demo brutally simple:
 
 That story is short, visual, and immediately understandable.
 
-There is a practical launch playbook in [`LAUNCH.md`](./LAUNCH.md) and a contributor plan in [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+There is a practical launch playbook in [`LAUNCH.md`](./LAUNCH.md), a contributor guide in [`CONTRIBUTING.md`](./CONTRIBUTING.md), release instructions in [`RELEASING.md`](./RELEASING.md), and a project history in [`CHANGELOG.md`](./CHANGELOG.md).
