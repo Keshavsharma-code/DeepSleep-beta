@@ -1,0 +1,12 @@
+.deepsleep/
+.pytest_cache/
+.venv/
+demo-project/
+build/
+dist/
+src/*.egg-info/
+src/**/*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

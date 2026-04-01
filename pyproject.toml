@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deepsleep-ai"
+version = "0.1.0"
+description = "Zero-cost background coding agent with layered memory, idle-time dreaming, and Ollama support."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+authors = [
+  { name = "DeepSleep" }
+]
+keywords = [
+  "agent",
+  "cli",
+  "ollama",
+  "deepseek",
+  "watchdog",
+  "memory",
+  "developer-tools",
+  "local-ai"
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Build Tools",
+  "Topic :: Software Development :: Libraries :: Python Modules"
+]
+dependencies = [
+  "typer>=0.12,<1.0",
+  "watchdog>=4.0,<7.0",
+  "prompt-toolkit>=3.0,<4.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0,<9.0"
+]
+
+[project.scripts]
+ds = "deepsleep_ai.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
