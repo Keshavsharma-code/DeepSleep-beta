@@ -47,6 +47,12 @@ dev = [
   "pytest>=8.0,<9.0"
 ]
 
+[project.urls]
+Homepage = "https://github.com/Keshavsharma-code/DeepSleep-beta"
+Repository = "https://github.com/Keshavsharma-code/DeepSleep-beta"
+Issues = "https://github.com/Keshavsharma-code/DeepSleep-beta/issues"
+Changelog = "https://github.com/Keshavsharma-code/DeepSleep-beta/releases"
+
 [project.scripts]
 ds = "deepsleep_ai.cli:main"
 
