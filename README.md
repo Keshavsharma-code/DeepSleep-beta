@@ -1,4 +1,4 @@
-# DeepSleep-bets
+# DeepSleep-beta
 
 [![PyPI version](https://img.shields.io/pypi/v/deepsleep-ai.svg)](https://pypi.org/project/deepsleep-ai/)
 [![Python versions](https://img.shields.io/pypi/pyversions/deepsleep-ai.svg)](https://pypi.org/project/deepsleep-ai/)
