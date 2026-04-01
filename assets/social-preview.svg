@@ -1,0 +1,50 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="640" y1="0" x2="640" y2="640" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#060B1E"/>
+      <stop offset="0.58" stop-color="#1A1022"/>
+      <stop offset="1" stop-color="#381B2C"/>
+    </linearGradient>
+    <linearGradient id="head" x1="410" y1="83" x2="218" y2="592" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#424B87"/>
+      <stop offset="0.58" stop-color="#171B46"/>
+      <stop offset="1" stop-color="#04071A"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="1280" height="640" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <path d="M302 84C370 66 439 88 484 136C519 174 536 226 533 284C531 317 551 343 556 385C562 441 541 512 473 562C421 599 351 620 282 620H124C145 590 154 560 156 532C161 472 135 449 119 426C91 387 91 346 102 307C112 271 126 245 162 210C191 182 219 158 253 132C279 112 288 98 302 84Z" fill="url(#head)"/>
+  <path d="M406 189C444 193 468 221 472 258C476 286 468 314 454 334C446 345 444 359 446 378C450 416 449 455 438 494C421 557 378 606 329 625H124C144 594 154 566 156 538C161 472 135 449 119 426C91 387 91 346 102 307C113 273 127 247 161 213C200 174 241 153 286 137C304 131 314 148 319 167C327 197 334 230 334 260C334 302 325 332 310 371C304 388 304 405 310 420C323 457 328 495 321 536C317 561 308 592 292 620H279C300 606 314 581 320 558C334 506 322 466 296 424C288 411 286 392 291 374C308 314 313 271 307 230C303 204 292 181 280 160C267 137 285 125 310 123C343 121 375 124 406 134C403 151 403 169 406 189Z" fill="#05081B" fill-opacity="0.58"/>
+
+  <g opacity="0.68">
+    <path d="M316 122C340 108 378 104 417 112C455 119 490 136 510 164" stroke="#A4A8EA" stroke-width="1.3"/>
+    <path d="M329 129C352 117 386 114 420 121C452 128 483 145 500 170" stroke="#A4A8EA" stroke-width="1.1"/>
+    <path d="M344 138C364 128 393 127 421 134C448 140 471 154 486 177" stroke="#C7CAFF" stroke-width="1"/>
+    <path d="M300 123C323 147 330 180 343 198C356 215 382 211 402 190C424 167 444 145 468 142C492 138 519 156 538 194" stroke="#F3F4FF" stroke-width="1.6"/>
+    <path d="M338 122C354 146 358 173 370 193C382 213 401 214 418 197C439 177 455 149 478 142C504 134 531 154 550 202" stroke="#D6D9FF" stroke-width="1.35"/>
+    <path d="M292 150C317 175 336 185 356 179C381 172 398 126 421 116C443 106 471 128 489 166C507 204 523 224 544 220C562 216 580 192 596 162C615 126 636 116 655 132C674 149 678 182 671 214" stroke="#EEF0FF" stroke-width="1.8"/>
+    <path d="M285 170C304 157 331 154 356 165C385 178 401 205 426 210C450 215 474 196 494 165C513 134 533 120 553 128C574 136 589 166 595 200" stroke="#B8BCFF" stroke-width="1.1"/>
+    <path d="M286 197C311 176 337 172 360 183C384 195 398 222 419 227C443 232 463 216 480 187C501 151 523 135 545 146C569 158 588 194 596 229" stroke="#9197EC" stroke-width="1"/>
+  </g>
+
+  <circle cx="442" cy="156" r="3.5" fill="#FFFFFF"/>
+  <circle cx="612" cy="168" r="2.6" fill="#E7E9FF"/>
+
+  <g fill="#E5E7FF" opacity="0.95" filter="url(#shadow)">
+    <text x="661" y="112" font-family="Helvetica, Arial, sans-serif" font-size="57" font-weight="700">Z</text>
+    <text x="736" y="165" font-family="Helvetica, Arial, sans-serif" font-size="57" font-weight="700">Z</text>
+    <text x="747" y="204" font-family="Helvetica, Arial, sans-serif" font-size="39" font-weight="500">z</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <text x="433" y="399" font-family="Helvetica, Arial, sans-serif" font-size="64" font-weight="700" fill="#F6F7FF">DeepSleep-beta</text>
+  </g>
+
+  <g opacity="0.95">
+    <path d="M1189 566C1196 579 1202 585 1216 592C1202 598 1196 604 1189 618C1182 604 1176 598 1162 592C1176 585 1182 579 1189 566Z" fill="#F4E7FF"/>
+  </g>
+</svg>

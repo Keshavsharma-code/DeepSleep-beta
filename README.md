@@ -5,6 +5,8 @@
 [![CI](https://github.com/Keshavsharma-code/DeepSleep-beta/actions/workflows/ci.yml/badge.svg)](https://github.com/Keshavsharma-code/DeepSleep-beta/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
+![DeepSleep social preview](./assets/social-preview.svg)
+
 DeepSleep is the open-source background agent for local models.
 
 It gives developers a `ds` workflow, a compact 3-layer memory file, and idle-time "dreaming" that summarizes recent work while they are away.
