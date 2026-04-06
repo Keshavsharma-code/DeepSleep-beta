@@ -2,9 +2,19 @@ from __future__ import annotations
 
 import copy
 import json
+import hashlib
+import base64
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from filelock import FileLock, Timeout
+from cryptography.fernet import Fernet
+import structlog
+
+from .config import DeepSleepConfig
+
+logger = structlog.get_logger()
 
 MAX_MEMORY_BYTES = 2048
 
@@ -14,24 +24,29 @@ def utc_now() -> str:
 
 
 class MemoryManager:
-    """Maintains DeepSleep's 3-layer memory in .deepsleep/memory.json."""
+    """Maintains DeepSleep's 3-layer memory in .deepsleep/memory.json with concurrency safety."""
 
-    def __init__(self, project_root: Path, max_bytes: int = MAX_MEMORY_BYTES) -> None:
+    def __init__(self, project_root: Path, config: Optional[DeepSleepConfig] = None) -> None:
         self.project_root = Path(project_root).resolve()
+        self.config = config or DeepSleepConfig.load_from_project(self.project_root)
         self.state_dir = self.project_root / ".deepsleep"
         self.memory_path = self.state_dir / "memory.json"
         self.activity_log_path = self.state_dir / "activity.jsonl"
         self.chat_history_path = self.state_dir / "prompt_history.txt"
-        self.max_bytes = max_bytes
+        self.lock_path = self.state_dir / ".memory.lock"
+        self.lock = FileLock(str(self.lock_path), timeout=5)
+        self.max_bytes = self.config.memory.max_bytes
 
     def initialize(self, force: bool = False) -> Path:
         self.state_dir.mkdir(parents=True, exist_ok=True)
 
-        if self.memory_path.exists() and not force:
-            return self.memory_path
+        with self.lock:
+            if self.memory_path.exists() and not force:
+                return self.memory_path
 
-        memory = self.default_memory()
-        self._write(memory)
+            memory = self.default_memory()
+            self._write_atomic(memory)
+        
         self.activity_log_path.touch(exist_ok=True)
         self.chat_history_path.touch(exist_ok=True)
         return self.memory_path
@@ -68,17 +83,26 @@ class MemoryManager:
         }
 
     def load(self) -> Dict[str, Any]:
+        try:
+            with self.lock.acquire(timeout=3):
+                return self._unsafe_load()
+        except Timeout:
+            logger.error("memory_load_timeout", path=str(self.memory_path))
+            raise RuntimeError("DeepSleep is busy in another process. Retry in 3 seconds.")
+
+    def _unsafe_load(self) -> Dict[str, Any]:
         if not self.memory_path.exists():
-            self.initialize()
+            return self.default_memory()
 
         with self.memory_path.open("r", encoding="utf-8") as handle:
             return json.load(handle)
 
     def save(self, memory: Dict[str, Any]) -> Dict[str, Any]:
-        memory = copy.deepcopy(memory)
-        compacted = self._compact(memory)
-        self._write(compacted)
-        return compacted
+        with self.lock:
+            memory = copy.deepcopy(memory)
+            compacted = self._compact(memory)
+            self._write_atomic(compacted)
+            return compacted
 
     def get_status(self) -> Dict[str, Any]:
         memory = self.load()
@@ -206,13 +230,18 @@ class MemoryManager:
         with self.activity_log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=True, separators=(",", ":")) + "\n")
 
-    def _write(self, memory: Dict[str, Any]) -> None:
+    def _write_atomic(self, memory: Dict[str, Any]) -> None:
         memory = copy.deepcopy(memory)
         memory["meta"]["updated_at"] = utc_now()
         raw = self._serialize(memory)
         memory["meta"]["byte_size"] = len(raw.encode("utf-8"))
         raw = self._serialize(memory)
-        self.memory_path.write_text(raw, encoding="utf-8")
+        
+        # Write to .tmp first, then atomic rename
+        tmp_path = self.memory_path.with_suffix('.tmp')
+        tmp_path.write_text(raw, encoding="utf-8")
+        tmp_path.replace(self.memory_path)
+        logger.debug("memory_save_atomic", path=str(self.memory_path), size=memory["meta"]["byte_size"])
 
     def _serialize(self, memory: Dict[str, Any]) -> str:
         return json.dumps(memory, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
@@ -349,3 +378,46 @@ class MemoryManager:
         if len(text) <= limit:
             return text
         return text[: max(limit - 3, 0)].rstrip() + "..."
+
+
+class SecureMemoryManager(MemoryManager):
+    """MemoryManager with At-Rest Encryption using Fernet."""
+
+    def __init__(self, project_root: Path, password: Optional[str] = None, config: Optional[DeepSleepConfig] = None) -> None:
+        super().__init__(project_root, config)
+        self.cipher = self._init_cipher(password) if password else None
+
+    def _init_cipher(self, password: str) -> Fernet:
+        # Derive key from password + project_path (unique per project)
+        salt = hashlib.sha256(str(self.project_root).encode()).digest()
+        key = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+        return Fernet(base64.urlsafe_b64encode(key[:32]))
+
+    def _write_atomic(self, memory: Dict[str, Any]) -> None:
+        memory = copy.deepcopy(memory)
+        memory["meta"]["updated_at"] = utc_now()
+        raw = self._serialize(memory)
+        memory["meta"]["byte_size"] = len(raw.encode("utf-8"))
+        raw = self._serialize(memory)
+
+        if self.cipher:
+            raw = self.cipher.encrypt(raw.encode()).decode()
+            logger.debug("memory_encrypt", path=str(self.memory_path))
+
+        tmp_path = self.memory_path.with_suffix('.tmp')
+        tmp_path.write_text(raw, encoding="utf-8")
+        tmp_path.replace(self.memory_path)
+
+    def _unsafe_load(self) -> Dict[str, Any]:
+        if not self.memory_path.exists():
+            return self.default_memory()
+
+        raw = self.memory_path.read_text(encoding="utf-8")
+        if self.cipher:
+            try:
+                raw = self.cipher.decrypt(raw.encode()).decode()
+            except Exception as exc:
+                logger.error("memory_decrypt_failed", error=str(exc))
+                raise RuntimeError("Failed to decrypt memory. Wrong password?")
+        
+        return json.loads(raw)

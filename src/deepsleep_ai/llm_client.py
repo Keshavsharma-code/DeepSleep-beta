@@ -3,9 +3,13 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+import html
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
+import structlog
+
+logger = structlog.get_logger()
 
 class OllamaUnavailableError(RuntimeError):
     """Raised when Ollama is unavailable."""
@@ -19,7 +23,7 @@ class LLMReply:
 
 
 class OllamaClient:
-    """Small Ollama client with a deterministic local fallback."""
+    """Small Ollama client with a deterministic local fallback and prompt sanitization."""
 
     def __init__(
         self,
@@ -64,10 +68,14 @@ class OllamaClient:
                 "temperature": 0.2,
             },
         }
+        logger.debug("ollama_generate_request", model=self.model)
         data = self._request("POST", "/api/generate", payload)
         response_text = str(data.get("response", "")).strip()
         if not response_text:
+            logger.error("ollama_empty_response", model=self.model)
             raise OllamaUnavailableError("Ollama returned an empty response.")
+        
+        logger.info("ollama_generate_success", model=self.model)
         return LLMReply(text=response_text, model=self.model, used_fallback=False)
 
     def answer_question(
@@ -80,17 +88,21 @@ class OllamaClient:
             "You are DeepSleep, a local coding copilot. Answer concisely, stay practical, "
             "use the provided project memory, and suggest file-specific next steps when relevant."
         )
+        # Sanitization happens in cli.py or here? 
+        # The spec says llm_client should sanitize too.
+        
         prompt = (
             f"Project memory:\n{memory_context}\n\n"
             f"Relevant file context:\n{file_context or 'No extra file context.'}\n\n"
-            f"User question: {question}\n\n"
+            f"User question: {self._sanitize_for_prompt(question)}\n\n"
             "Answer in a terminal-friendly style. If the user asks what they were doing, "
             "summarize the active session and recent files."
         )
 
         try:
             return self.generate(system_prompt, prompt)
-        except OllamaUnavailableError:
+        except OllamaUnavailableError as exc:
+            logger.warning("ollama_fallback_triggered", error=str(exc))
             return self._fallback_answer(question, memory_context, file_context)
 
     def summarize_activity(
@@ -103,9 +115,12 @@ class OllamaClient:
             "You are DeepSleep's dream loop. Write a compact session summary using only factual "
             "details from the changed files. Mention the most likely task and the next sensible step."
         )
+        
         snippet_block = "\n\n".join(
-            f"[{path}]\n{snippet}" for path, snippet in file_snippets.items()
+            f"[{path}]\n{self._sanitize_for_prompt(snippet)}" 
+            for path, snippet in file_snippets.items()
         )
+        
         prompt = (
             f"Previous session summary:\n{previous_summary}\n\n"
             f"Changed files:\n- " + "\n- ".join(changed_files) + "\n\n"
@@ -115,8 +130,16 @@ class OllamaClient:
 
         try:
             return self.generate(system_prompt, prompt)
-        except OllamaUnavailableError:
+        except OllamaUnavailableError as exc:
+            logger.warning("ollama_fallback_triggered", error=str(exc))
             return self._fallback_summary(changed_files, file_snippets, previous_summary)
+
+    def _sanitize_for_prompt(self, text: str) -> str:
+        """Prevent prompt injection via file content or user input."""
+        # Remove potential control characters
+        text = ''.join(char for char in text if ord(char) >= 32 or char in '\n\r\t')
+        # Escape XML/HTML tags
+        return html.escape(text)
 
     def _fallback_answer(
         self,

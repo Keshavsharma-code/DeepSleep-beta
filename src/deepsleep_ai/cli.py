@@ -1,18 +1,25 @@
 from __future__ import annotations
 
 import re
+import os
+import shutil
+import html
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import typer
+import structlog
 from prompt_toolkit import HTML, PromptSession, print_formatted_text
 from prompt_toolkit.completion import Completer, Completion, PathCompleter, WordCompleter
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.styles import Style
 
 from .llm_client import OllamaClient
-from .memory_manager import MemoryManager
+from .memory_manager import MemoryManager, SecureMemoryManager
 from .watcher import DreamWatcher
+from .config import DeepSleepConfig
+
+logger = structlog.get_logger()
 
 app = typer.Typer(
     add_completion=False,
@@ -32,6 +39,11 @@ PROMPT_STYLE = Style.from_dict(
     }
 )
 
+SENSITIVE_PATTERNS = {
+    r'\.env$', r'\.ssh', r'id_rsa', r'\.aws', r'\.docker', 
+    r'secrets?', r'credentials', r'password', r'token'
+}
+
 
 class DeepSleepCompleter(Completer):
     def __init__(self) -> None:
@@ -45,10 +57,44 @@ class DeepSleepCompleter(Completer):
             yield completion
 
 
-def _bootstrap(project_root: Path, force: bool = False) -> MemoryManager:
-    manager = MemoryManager(project_root)
+def _bootstrap(project_root: Path, force: bool = False, password: Optional[str] = None) -> MemoryManager:
+    config = DeepSleepConfig.load_from_project(project_root)
+    if config.privacy.encrypt_memory or password:
+        manager = SecureMemoryManager(project_root, password=password, config=config)
+    else:
+        manager = MemoryManager(project_root, config=config)
+    
     manager.initialize(force=force)
     return manager
+
+
+def _resolve_safely(project_root: Path, token: str) -> Optional[Path]:
+    """Prevent path traversal attacks."""
+    try:
+        # Normalize and resolve
+        candidate = (project_root / token).resolve()
+        # Critical: Ensure resolved path is still within project root
+        candidate.relative_to(project_root.resolve())
+        
+        # Check for symlink escape
+        if candidate.is_symlink():
+            real_path = candidate.resolve()
+            real_path.relative_to(project_root.resolve())
+            
+        if not candidate.exists() or not candidate.is_file():
+            return None
+            
+        if _is_sensitive(candidate):
+            logger.warning("sensitive_file_blocked", path=str(candidate))
+            return None
+            
+        return candidate
+    except (ValueError, RuntimeError, OSError):  # ValueError from relative_to
+        return None
+
+
+def _is_sensitive(path: Path) -> bool:
+    return any(re.search(pattern, str(path), re.I) for pattern in SENSITIVE_PATTERNS)
 
 
 def _collect_file_context(project_root: Path, question: str, memory_manager: MemoryManager) -> List[str]:
@@ -56,15 +102,18 @@ def _collect_file_context(project_root: Path, question: str, memory_manager: Mem
 
     for match in FILE_TOKEN_PATTERN.finditer(question):
         token = match.group("path")
-        candidate = (project_root / token).resolve()
-        if candidate.exists() and candidate.is_file():
-            file_candidates.append(str(candidate.relative_to(project_root)))
+        safe_path = _resolve_safely(project_root, token)
+        if safe_path:
+            file_candidates.append(str(safe_path.relative_to(project_root)))
 
     lowered = question.lower()
     if "this file" in lowered or "that file" in lowered:
-        recent_files = memory_manager.load()["session"]["recent_files"]
+        memory = memory_manager.load()
+        recent_files = memory["session"]["recent_files"]
         for candidate in recent_files[:1]:
-            file_candidates.append(candidate)
+            # Still verify existence for recent files in case they were deleted
+            if (project_root / candidate).exists():
+                file_candidates.append(candidate)
 
     deduped: List[str] = []
     for file_path in file_candidates:
@@ -81,7 +130,10 @@ def _render_file_context(project_root: Path, relative_paths: List[str]) -> str:
             content = target.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
             continue
-        blocks.append(f"[{relative_path}]\n{content[:1800]}")
+        
+        # Sanitize for prompt
+        sanitized = html.escape(content[:1800])
+        blocks.append(f"---BEGIN_FILE: {relative_path}---\n{sanitized}\n---END_FILE---")
     return "\n\n".join(blocks)
 
 
@@ -144,8 +196,8 @@ def _handle_slash_command(
     return "unhandled"
 
 
-def chat_loop(project_root: Path, model: str, host: str) -> None:
-    memory_manager = _bootstrap(project_root)
+def chat_loop(project_root: Path, model: str, host: str, password: Optional[str] = None) -> None:
+    memory_manager = _bootstrap(project_root, password=password)
     client = OllamaClient(model=model, host=host)
     session = PromptSession(
         history=FileHistory(str(memory_manager.chat_history_path)),
@@ -194,6 +246,7 @@ def default_chat(
     path: Path = typer.Option(Path("."), "--path", help="Project root to watch and chat against."),
     model: str = typer.Option("deepseek-r1", "--model", help="Ollama model name."),
     host: str = typer.Option("http://127.0.0.1:11434", "--host", help="Ollama host."),
+    password: Optional[str] = typer.Option(None, "--password", "-p", help="Password for encrypted memory."),
     version: bool = typer.Option(
         False,
         "--version",
@@ -207,18 +260,24 @@ def default_chat(
     _ = version
 
     if ctx.invoked_subcommand is None:
-        chat_loop(path.resolve(), model, host)
+        chat_loop(path.resolve(), model, host, password=password)
 
 
 @app.command()
 def init(
     path: Path = typer.Argument(Path("."), help="Project root to initialize."),
     force: bool = typer.Option(False, "--force", help="Overwrite an existing memory.json."),
+    encrypt: bool = typer.Option(False, "--encrypt", help="Enable memory encryption."),
 ) -> None:
     """Create .deepsleep/ and memory.json in the project folder."""
-
-    manager = _bootstrap(path.resolve(), force=force)
+    password = None
+    if encrypt:
+        password = typer.prompt("Enter encryption password", hide_input=True)
+    
+    manager = _bootstrap(path.resolve(), force=force, password=password)
     typer.echo(f"Initialized DeepSleep at {manager.memory_path}")
+    if encrypt:
+        typer.echo("Encryption enabled.")
 
 
 @app.command()
@@ -226,10 +285,11 @@ def chat(
     path: Path = typer.Argument(Path("."), help="Project root to chat against."),
     model: str = typer.Option("deepseek-r1", "--model", help="Ollama model name."),
     host: str = typer.Option("http://127.0.0.1:11434", "--host", help="Ollama host."),
+    password: Optional[str] = typer.Option(None, "--password", "-p", help="Password for encrypted memory."),
 ) -> None:
     """Open the interactive chat UI."""
 
-    chat_loop(path.resolve(), model, host)
+    chat_loop(path.resolve(), model, host, password=password)
 
 
 @app.command()
@@ -289,34 +349,53 @@ def doctor(
     host: str = typer.Option("http://127.0.0.1:11434", "--host", help="Ollama host."),
 ) -> None:
     """Check local setup before launch or demo."""
+    _run_health_checks(path, model, host, format="text", exit_on_fail=False)
 
+
+@app.command()
+def health(
+    path: Path = typer.Argument(Path("."), help="Project root to inspect."),
+    model: str = typer.Option("deepseek-r1", "--model", help="Ollama model name."),
+    host: str = typer.Option("http://127.0.0.1:11434", "--host", help="Ollama host."),
+    format: str = typer.Option("text", "--format", help="text|json"),
+) -> None:
+    """Comprehensive system health check."""
+    _run_health_checks(path, model, host, format=format, exit_on_fail=True)
+
+
+def _run_health_checks(
+    path: Path,
+    model: str,
+    host: str,
+    format: str = "text",
+    exit_on_fail: bool = True,
+) -> None:
     project_root = path.resolve()
     manager = _bootstrap(project_root)
-    client = OllamaClient(model=model, host=host, timeout=5)
-    memory_path = manager.memory_path
+    client = OllamaClient(model=model, host=host)
+    
     available = client.is_available()
-    model_ready = client.model_available(model) if available else False
-    status_data = manager.get_status()
-
     checks = [
-        ("project-root", project_root.exists(), str(project_root)),
-        ("memory-file", memory_path.exists(), str(memory_path)),
-        ("activity-log", manager.activity_log_path.exists(), str(manager.activity_log_path)),
-        ("prompt-history", manager.chat_history_path.exists(), str(manager.chat_history_path)),
-        ("ollama-host", available, host),
-        ("ollama-model", model_ready, model if available else "Ollama offline"),
+        ("project-root", project_root.exists()),
+        ("memory-file", manager.memory_path.exists()),
+        ("activity-log", manager.activity_log_path.exists()),
+        ("prompt-history", manager.chat_history_path.exists()),
+        ("ollama-host", available),
+        ("ollama-model", client.model_available(model) if available else False),
+        ("disk-space", shutil.disk_usage(project_root).free > 1e9),  # 1GB
+        ("git-repo", (project_root / ".git").exists())
     ]
-
-    for label, ok, detail in checks:
-        prefix = "OK" if ok else "WARN"
-        typer.echo(f"{prefix:<4} {label:<14} {detail}")
-
-    typer.echo(f"INFO recent-files    {', '.join(status_data['recent_files']) or 'none'}")
-    typer.echo(f"INFO session-summary {status_data['session_summary']}")
-    if not available:
-        typer.echo("TIP  Start Ollama with: ollama serve")
-    elif not model_ready:
-        typer.echo(f"TIP  Pull the model with: ollama pull {model}")
+    
+    if format == "json":
+        import json
+        typer.echo(json.dumps(dict(checks), indent=2))
+    else:
+        for label, ok in checks:
+            status = "OK" if ok else "WARN" if not exit_on_fail else "FAIL"
+            typer.echo(f"{status:<5} {label}")
+            
+    if exit_on_fail and not all(ok for _, ok in checks):
+        raise typer.Exit(code=1)
 
 
 def main() -> None:

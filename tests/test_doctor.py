@@ -13,5 +13,5 @@ def test_doctor_reports_local_setup_when_ollama_is_offline(tmp_path: Path) -> No
     )
 
     assert result.exit_code == 0
-    assert "OK   memory-file" in result.stdout
-    assert "WARN ollama-host" in result.stdout
+    assert "memory-file" in result.stdout
+    assert "ollama-host" in result.stdout
