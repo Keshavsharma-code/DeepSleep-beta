@@ -4,12 +4,15 @@ import copy
 import json
 import hashlib
 import base64
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from filelock import FileLock, Timeout
-from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
 import structlog
 
 from .config import DeepSleepConfig
@@ -17,6 +20,7 @@ from .config import DeepSleepConfig
 logger = structlog.get_logger()
 
 MAX_MEMORY_BYTES = 2048
+ENC_MAGIC = "DS_V1_ENC:" # Magic header for encrypted files
 
 
 def utc_now() -> str:
@@ -381,43 +385,85 @@ class MemoryManager:
 
 
 class SecureMemoryManager(MemoryManager):
-    """MemoryManager with At-Rest Encryption using Fernet."""
+    """MemoryManager with Verified AES-256 GCM Encryption."""
 
     def __init__(self, project_root: Path, password: Optional[str] = None, config: Optional[DeepSleepConfig] = None) -> None:
         super().__init__(project_root, config)
-        self.cipher = self._init_cipher(password) if password else None
+        self.password = password
+        self.aes_key: Optional[bytes] = None
 
-    def _init_cipher(self, password: str) -> Fernet:
-        # Derive key from password + project_path (unique per project)
-        salt = hashlib.sha256(str(self.project_root).encode()).digest()
-        key = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
-        return Fernet(base64.urlsafe_b64encode(key[:32]))
+    def _derive_key(self, password: str, salt: bytes) -> bytes:
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32, # AES-256
+            salt=salt,
+            iterations=100000,
+        )
+        return kdf.derive(password.encode())
 
     def _write_atomic(self, memory: Dict[str, Any]) -> None:
+        if not self.password:
+            raise RuntimeError("Password required for SecureMemoryManager.")
+
         memory = copy.deepcopy(memory)
         memory["meta"]["updated_at"] = utc_now()
-        raw = self._serialize(memory)
-        memory["meta"]["byte_size"] = len(raw.encode("utf-8"))
-        raw = self._serialize(memory)
+        raw_json = self._serialize(memory)
+        memory["meta"]["byte_size"] = len(raw_json.encode("utf-8"))
+        raw_json = self._serialize(memory)
 
-        if self.cipher:
-            raw = self.cipher.encrypt(raw.encode()).decode()
-            logger.debug("memory_encrypt", path=str(self.memory_path))
+        # AES-256 GCM Implementation
+        salt = os.urandom(16)
+        nonce = os.urandom(12)
+        key = self._derive_key(self.password, salt)
+        aesgcm = AESGCM(key)
+        ciphertext = aesgcm.encrypt(nonce, raw_json.encode(), None)
+
+        # Format: MAGIC + SALT + NONCE + CIPHERTEXT
+        # Magic is needed for detection by CLI
+        header = ENC_MAGIC.encode()
+        payload = header + salt + nonce + ciphertext
+        encoded = base64.b64encode(payload).decode()
 
         tmp_path = self.memory_path.with_suffix('.tmp')
-        tmp_path.write_text(raw, encoding="utf-8")
+        tmp_path.write_text(encoded, encoding="utf-8")
         tmp_path.replace(self.memory_path)
+        logger.debug("memory_encrypt_aes256", path=str(self.memory_path))
 
     def _unsafe_load(self) -> Dict[str, Any]:
         if not self.memory_path.exists():
             return self.default_memory()
 
-        raw = self.memory_path.read_text(encoding="utf-8")
-        if self.cipher:
-            try:
-                raw = self.cipher.decrypt(raw.encode()).decode()
-            except Exception as exc:
-                logger.error("memory_decrypt_failed", error=str(exc))
-                raise RuntimeError("Failed to decrypt memory. Wrong password?")
+        raw_content = self.memory_path.read_text(encoding="utf-8")
         
-        return json.loads(raw)
+        # Check for magic header
+        try:
+            decoded = base64.b64decode(raw_content)
+        except Exception:
+            # Not base64, assume unencrypted or corrupted
+            return json.loads(raw_content)
+
+        magic = ENC_MAGIC.encode()
+        if not decoded.startswith(magic):
+            # Not encrypted with our V1 magic, try plain JSON
+            return json.loads(raw_content)
+
+        if not self.password:
+            # Should be handled by CLI bootstrap before calling load()
+            raise RuntimeError("Project is encrypted. Password required.")
+
+        # Extract Salt, Nonce, and Ciphertext
+        ptr = len(magic)
+        salt = decoded[ptr:ptr+16]
+        ptr += 16
+        nonce = decoded[ptr:ptr+12]
+        ptr += 12
+        ciphertext = decoded[ptr:]
+
+        try:
+            key = self._derive_key(self.password, salt)
+            aesgcm = AESGCM(key)
+            plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+            return json.loads(plaintext.decode())
+        except Exception as exc:
+            logger.error("memory_decrypt_failed", error=str(exc))
+            raise RuntimeError("Invalid password or corrupted deepsleep memory.")

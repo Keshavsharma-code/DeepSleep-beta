@@ -4,6 +4,7 @@ import re
 import os
 import shutil
 import html
+import base64
 from pathlib import Path
 from typing import List, Optional
 
@@ -15,7 +16,7 @@ from prompt_toolkit.history import FileHistory
 from prompt_toolkit.styles import Style
 
 from .llm_client import OllamaClient
-from .memory_manager import MemoryManager, SecureMemoryManager
+from .memory_manager import MemoryManager, SecureMemoryManager, ENC_MAGIC
 from .watcher import DreamWatcher
 from .config import DeepSleepConfig
 
@@ -59,7 +60,24 @@ class DeepSleepCompleter(Completer):
 
 def _bootstrap(project_root: Path, force: bool = False, password: Optional[str] = None) -> MemoryManager:
     config = DeepSleepConfig.load_from_project(project_root)
-    if config.privacy.encrypt_memory or password:
+    memory_path = project_root / ".deepsleep" / "memory.json"
+    
+    # Encryption Detection
+    needs_encryption = config.privacy.encrypt_memory or password is not None
+    
+    if memory_path.exists():
+        try:
+            content = memory_path.read_text(encoding="utf-8")
+            decoded = base64.b64decode(content[:100]) # Quick check of the start
+            if decoded.startswith(ENC_MAGIC.encode()):
+                needs_encryption = True
+                if not password:
+                    # Prompt for password if not provided but file is encrypted
+                    password = typer.prompt("Project is AES-256 encrypted. Enter password", hide_input=True)
+        except Exception:
+            pass
+            
+    if needs_encryption:
         manager = SecureMemoryManager(project_root, password=password, config=config)
     else:
         manager = MemoryManager(project_root, config=config)
@@ -267,17 +285,17 @@ def default_chat(
 def init(
     path: Path = typer.Argument(Path("."), help="Project root to initialize."),
     force: bool = typer.Option(False, "--force", help="Overwrite an existing memory.json."),
-    encrypt: bool = typer.Option(False, "--encrypt", help="Enable memory encryption."),
+    encrypt: bool = typer.Option(False, "--encrypt", help="Enable AES-256 memory encryption."),
 ) -> None:
     """Create .deepsleep/ and memory.json in the project folder."""
     password = None
     if encrypt:
-        password = typer.prompt("Enter encryption password", hide_input=True)
+        password = typer.prompt("Enter AES-256 encryption password", hide_input=True)
     
     manager = _bootstrap(path.resolve(), force=force, password=password)
     typer.echo(f"Initialized DeepSleep at {manager.memory_path}")
     if encrypt:
-        typer.echo("Encryption enabled.")
+        typer.echo("AES-256 GCM Encryption enabled.")
 
 
 @app.command()
@@ -371,10 +389,13 @@ def _run_health_checks(
     exit_on_fail: bool = True,
 ) -> None:
     project_root = path.resolve()
+    # Bootstrap might prompt for password
     manager = _bootstrap(project_root)
     client = OllamaClient(model=model, host=host)
     
     available = client.is_available()
+    encrypted = isinstance(manager, SecureMemoryManager)
+    
     checks = [
         ("project-root", project_root.exists()),
         ("memory-file", manager.memory_path.exists()),
@@ -383,7 +404,8 @@ def _run_health_checks(
         ("ollama-host", available),
         ("ollama-model", client.model_available(model) if available else False),
         ("disk-space", shutil.disk_usage(project_root).free > 1e9),  # 1GB
-        ("git-repo", (project_root / ".git").exists())
+        ("git-repo", (project_root / ".git").exists()),
+        ("aes-256-encryption", encrypted)
     ]
     
     if format == "json":
