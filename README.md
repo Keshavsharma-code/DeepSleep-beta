@@ -7,13 +7,40 @@
 
 ![DeepSleep social preview](./assets/social-preview.svg)
 
-DeepSleep is the open-source background agent for local models.
+DeepSleep is the open-source background agent for local models. It gives developers a `ds` workflow, a compact 3-layer memory file, and idle-time "dreaming" that summarizes recent work while they are away.
 
-It gives developers a `ds` workflow, a compact 3-layer memory file, and idle-time "dreaming" that summarizes recent work while they are away.
+---
 
-It is positioned for developers looking for an open-source AI coding agent, a local-LLM developer tool, a terminal copilot, or a Claude Code alternative that runs on Ollama instead of a hosted API.
+## 🐣 The Dumbest Guide (Read this if you're lost)
 
-It is written from scratch and safe to publish. The architecture is inspired by the broader always-on agent pattern, not copied from leaked source code or source maps.
+### What is this?
+Imagine you're coding. You take a coffee break. You come back and forget what you were doing. **DeepSleep** was watching your files while you were gone. It "dreamed" about your changes and wrote a summary. Now you just ask `ds > What was I working on?` and it tells you. **It's like a brain for your folder.**
+
+### How to use (The 3-step shuffle)
+1. **Init**: Open your terminal in your project folder and type `ds init`. This makes a tiny hidden brain folder (`.deepsleep`).
+2. **Dream**: Run `ds dream` in a corner of your screen. It just sits there. When you stop typing for a bit, it writes down what you did.
+3. **Chat**: Type `ds` whenever you want to talk to your code. Ask things like *"Where did I leave that API key?"* or *"What's next?"*
+
+### How to deal with errors ️
+- **"Ollama not found"**: You need [Ollama](https://ollama.com/) running. It's the engine. Download it, run it, and try again.
+- **"Permission Denied"**: DeepSleep needs to write its memory file. Make sure you have permission to write in the current folder.
+- **"Stuck dreaming"**: If `ds dream` isn't doing anything, make sure you actually *saved* some files. It only dreams when things change!
+- **"Garbage answers"**: Local models can be silly. Type `/memory` to see what it actually remembers. If it's wrong, you can just tell it!
+
+---
+
+## 🎯 v1.0 Production-Grade Features (New!)
+
+We've hardened DeepSleep for enterprise-level monorepos:
+
+- **🔒 Atomic Security**: `FileLock` prevents memory corruption even if you run multiple `ds` instances.
+- **🛡️ Path Traversal Sandbox**: DeepSleep is now locked to your project root. It will never leak your `.ssh` or `.env` files to the AI.
+- **📂 Gitignore-Aware**: It respects your `.gitignore` perfectly. No more indexing `node_modules` or `dist` garbage.
+- **⚡ Incremental Indexing**: Uses a local SQLite index to track millions of files instantly without slowing down your machine.
+- **🔐 At-Rest Encryption**: Use `ds init --encrypt` to protect your project memory with a password (AES-256).
+- **📝 Structured Observability**: Now with `structlog` for clean, machine-friendly logs and a `ds health` command.
+
+---
 
 ## Why it lands fast
 
@@ -42,8 +69,6 @@ DeepSleep is best described as:
 - a background agent for codebases
 - a terminal copilot for Ollama
 - a local-model alternative to hosted coding assistants
-
-If people are searching for phrases like `open source claude code alternative`, `local ai coding agent`, `ollama coding assistant`, or `background agent for developers`, this is the category DeepSleep belongs in.
 
 ## Quick demo
 
@@ -90,8 +115,6 @@ After `5 minutes` of inactivity, it:
 3. writes a fresh session summary into memory
 4. preserves only the highest-signal context under the 2KB cap
 
-That is what makes `What was I doing?` feel instant the next time you open the project.
-
 ## Install
 
 ### PyPI
@@ -104,7 +127,7 @@ Quick check:
 
 ```bash
 ds --version
-ds doctor
+ds health
 ```
 
 ### Local development
@@ -125,89 +148,38 @@ ollama pull deepseek-r1
 ## Commands
 
 ```bash
-ds init
-ds
-ds chat
-ds dream
-ds dream --idle-seconds 300
-ds status
-ds doctor
+ds init          # Start a new brain for your project
+ds init --encrypt # Start a password-protected brain
+ds               # Start chatting
+ds chat          # Alias for ds
+ds dream         # Start the background watcher
+ds dream --once  # Run one dream cycle right now
+ds status        # Peek inside the brain
+ds health        # Check if everything is setup correctly
 ```
-
-## Why it feels real
-
-- installs directly from PyPI
-- keeps memory deterministic and compact
-- works with local models through Ollama
-- degrades gracefully when Ollama is offline
-- ships CI, tests, and a release workflow
-
-## First-run workflow
-
-### 1. Initialize a project
-
-```bash
-ds init
-```
-
-This creates:
-
-- `.deepsleep/memory.json`
-- `.deepsleep/activity.jsonl`
-- `.deepsleep/prompt_history.txt`
-
-### 2. Validate your setup
-
-```bash
-ds doctor
-```
-
-It checks the memory files, Ollama reachability, and whether your chosen model is available.
-
-### 3. Start the interactive UI
-
-```bash
-ds
-```
-
-Inside the prompt you can ask:
-
-- `What was I doing?`
-- `Refactor src/deepsleep_ai/cli.py`
-- `Summarize the recent changes`
-
-Slash commands:
-
-- `/help`
-- `/status`
-- `/memory`
-- `/dream`
-- `/quit`
-
-### 4. Start the dream loop
-
-```bash
-ds dream
-```
-
-DeepSleep watches the current project with Watchdog and writes fresh session context after idle periods.
-
-### 5. One-shot demo mode
-
-```bash
-ds dream --once
-```
-
-This is great for screenshots, demos, and launch videos because it snapshots recently touched files even if the watcher was not already running.
 
 ## Package layout
-
-The MVP is centered on these four files:
 
 - [`cli.py`](./src/deepsleep_ai/cli.py): Typer entrypoint and Prompt Toolkit UI
 - [`watcher.py`](./src/deepsleep_ai/watcher.py): Watchdog-based idle watcher and dream loop
 - [`memory_manager.py`](./src/deepsleep_ai/memory_manager.py): layered memory store with 2KB compaction
 - [`llm_client.py`](./src/deepsleep_ai/llm_client.py): Ollama connector with safe local fallback
+- [`config.py`](./src/deepsleep_ai/config.py): Pydantic-powered configuration management
+
+---
+
+## 🤝 Contributing
+
+We love builders! If you want to make DeepSleep even better:
+
+1. **Check the Roadmap**: See what we're building in [ROADMAP.md](./ROADMAP.md).
+2. **Read the Guide**: Hop into [CONTRIBUTING.md](./CONTRIBUTING.md) for setup steps.
+3. **Open an Issue**: Found a bug? Tell us!
+4. **Pull Requests**: Send your code. We're fast at reviewing.
+
+*Note: Please ensure all tests pass (`pytest`) before submitting!*
+
+---
 
 ## Trust signals
 
@@ -221,22 +193,11 @@ The MVP is centered on these four files:
 ## Self-test
 
 ```bash
-pytest -q
+pytest -v
 python -m deepsleep_ai --help
 python -m build --no-isolation
 ```
 
-## Launch kit
-
-If you want this repo to travel, keep the demo brutally simple:
-
-1. `ds init`
-2. edit two files
-3. `ds dream --once`
-4. show `.deepsleep/memory.json`
-5. ask `What was I doing?`
-6. run `ds doctor`
-
-That story is short, visual, and immediately understandable.
+---
 
 There is a practical launch playbook in [`LAUNCH.md`](./LAUNCH.md), a contributor guide in [`CONTRIBUTING.md`](./CONTRIBUTING.md), release instructions in [`RELEASING.md`](./RELEASING.md), and a project history in [`CHANGELOG.md`](./CHANGELOG.md).
