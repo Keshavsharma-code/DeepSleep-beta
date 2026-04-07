@@ -420,6 +420,130 @@ def _run_health_checks(
         raise typer.Exit(code=1)
 
 
+def _render_markdown_report(entries: list, project_name: str) -> str:
+    from datetime import date
+    lines = [
+        f"# DeepSleep Standup — {project_name}",
+        f"**Date:** {date.today().isoformat()}",
+        "",
+    ]
+
+    dreams = [e for e in entries if e["type"] == "dream"]
+    chats  = [e for e in entries if e["type"] == "chat_turn"]
+    files  = [e for e in entries if e["type"] == "file_event"]
+
+    if dreams:
+        lines.append("## 🌙 Dream Summaries")
+        for d in dreams:
+            ts = d["timestamp"][:16]
+            summary = d["payload"].get("summary", "")
+            lines.append(f"- **{ts}** — {summary}")
+        lines.append("")
+
+    if chats:
+        lines.append("## 💬 Chat Activity")
+        for c in chats:
+            ts = c["timestamp"][:16]
+            user_msg = c["payload"].get("user", "")[:120]
+            lines.append(f"- **{ts}** — {user_msg}")
+        lines.append("")
+
+    touched = list({e["payload"]["path"] for e in files})
+    if touched:
+        lines.append("## 📂 Files Touched")
+        for f in touched:
+            lines.append(f"- `{f}`")
+        lines.append("")
+
+    if not dreams and not chats and not touched:
+        lines.append("_No activity recorded._")
+
+    return "\n".join(lines)
+
+
+@app.command()
+def forget(
+    path: Path = typer.Argument(Path("."), help="Project root."),
+    layer: Optional[str] = typer.Option(None, "--layer", help="Layer to wipe: project, session, or ephemeral."),
+    key: Optional[str] = typer.Option(None, "--key", help="Specific field to wipe, e.g. session.recent_files"),
+    all: bool = typer.Option(False, "--all", help="Full memory reset."),
+) -> None:
+    """Selectively wipe parts of DeepSleep memory."""
+    manager = _bootstrap(path.resolve())
+
+    if all:
+        confirm = typer.confirm("This will wipe ALL memory. Are you sure?")
+        if not confirm:
+            typer.echo("Aborted.")
+            return
+        manager.initialize(force=True)
+        typer.echo("Memory fully reset.")
+        return
+
+    if key:
+        parts = key.split(".", 1)
+        if len(parts) != 2:
+            typer.echo("--key must be in format layer.field, e.g. session.recent_files")
+            raise typer.Exit(1)
+        manager.forget_key(parts[0], parts[1])
+        typer.echo(f"Cleared: {key}")
+        return
+
+    if layer:
+        confirm = typer.confirm(f"Wipe the '{layer}' layer?")
+        if not confirm:
+            typer.echo("Aborted.")
+            return
+        manager.forget_layer(layer)
+        typer.echo(f"Layer '{layer}' reset to defaults.")
+        return
+
+    typer.echo("What do you want to forget?")
+    typer.echo("  1) session   (recent files, tasks, dream summary)")
+    typer.echo("  2) ephemeral (last chat, open questions, recent changes)")
+    typer.echo("  3) project   (goals, facts, project summary)")
+    typer.echo("  4) everything")
+    choice = typer.prompt("Choice [1-4]")
+    layer_map = {"1": "session", "2": "ephemeral", "3": "project"}
+    if choice == "4":
+        manager.initialize(force=True)
+        typer.echo("Memory fully reset.")
+    elif choice in layer_map:
+        manager.forget_layer(layer_map[choice])
+        typer.echo(f"Layer '{layer_map[choice]}' cleared.")
+    else:
+        typer.echo("Invalid choice.")
+
+
+@app.command()
+def export(
+    path: Path = typer.Argument(Path("."), help="Project root."),
+    since: Optional[str] = typer.Option(None, "--since", help="Only include entries from this ISO date onward, e.g. 2025-01-01."),
+    out: Optional[Path] = typer.Option(None, "--out", help="Write output to this file instead of stdout."),
+    format: str = typer.Option("markdown", "--format", help="Output format: markdown or json."),
+) -> None:
+    """Export the activity log and memory as a standup report."""
+    import json as json_module
+
+    manager = _bootstrap(path.resolve())
+    entries = manager.export_activity(since=since)
+
+    if not entries:
+        typer.echo("No activity found for the given filters.")
+        return
+
+    if format == "json":
+        output = json_module.dumps(entries, indent=2, ensure_ascii=False)
+    else:
+        output = _render_markdown_report(entries, path.resolve().name)
+
+    if out:
+        out.write_text(output, encoding="utf-8")
+        typer.echo(f"Report saved to {out}")
+    else:
+        typer.echo(output)
+
+
 def main() -> None:
     app()
 
