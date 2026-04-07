@@ -383,6 +383,44 @@ class MemoryManager:
             return text
         return text[: max(limit - 3, 0)].rstrip() + "..."
 
+    def forget_layer(self, layer: str) -> Dict[str, Any]:
+        """Reset a specific memory layer to its defaults."""
+        valid = {"project", "session", "ephemeral"}
+        if layer not in valid:
+            raise ValueError(f"Layer must be one of: {valid}")
+        memory = self.load()
+        defaults = self.default_memory()
+        memory[layer] = defaults[layer]
+        return self.save(memory)
+
+    def forget_key(self, layer: str, key: str) -> Dict[str, Any]:
+        """Reset a specific field within a layer to its default."""
+        memory = self.load()
+        defaults = self.default_memory()
+        if layer not in memory or key not in memory[layer]:
+            raise ValueError(f"Key '{layer}.{key}' not found in memory.")
+        memory[layer][key] = defaults[layer][key]
+        return self.save(memory)
+
+    def export_activity(self, since: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Read activity.jsonl and return filtered log entries."""
+        if not self.activity_log_path.exists():
+            return []
+        entries = []
+        with self.activity_log_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                    if since and record.get("timestamp", "") < since:
+                        continue
+                    entries.append(record)
+                except json.JSONDecodeError:
+                    continue
+        return entries
+
 
 class SecureMemoryManager(MemoryManager):
     """MemoryManager with Verified AES-256 GCM Encryption."""
