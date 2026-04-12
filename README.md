@@ -11,6 +11,11 @@ DeepSleep is the open-source background agent for local models. It gives develop
 
 ---
 
+## 🔗 The Digital Ecosystem
+*   **[DeepSleep-Hub](https://github.com/Keshavsharma-code/deepsleep-hub)**: Our browser-based companion. A universal neural bridge for ChatGPT, Claude, and Gemini with a 3D Visual Cortex.
+
+---
+
 ## 🐣 The Dumbest Guide (Read this if you're lost)
 
 ### What is this?
