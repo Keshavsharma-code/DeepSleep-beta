@@ -17,5 +17,9 @@ def test_chat_exits_cleanly_on_quit(tmp_path: Path) -> None:
         check=False,
     )
 
+    if result.returncode != 0 and "NoConsoleScreenBufferError" in result.stderr:
+        import pytest
+        pytest.skip("No Windows console available in this environment")
+
     assert result.returncode == 0
     assert "DeepSleep ended." in result.stdout
