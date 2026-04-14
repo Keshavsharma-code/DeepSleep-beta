@@ -4,6 +4,8 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/deepsleep-ai.svg)](https://pypi.org/project/deepsleep-ai/)
 [![CI](https://github.com/Keshavsharma-code/DeepSleep-beta/actions/workflows/ci.yml/badge.svg)](https://github.com/Keshavsharma-code/DeepSleep-beta/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+<br>
+<a href="https://www.producthunt.com/products/deepsleep-2?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-deepsleep" target="_blank" rel="noopener noreferrer"><img alt="DeepSleep - The coding agent that dreams while you sleep | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1122051&amp;theme=light&amp;t=1776152379902"></a>
 
 ![DeepSleep social preview](./assets/social-preview.svg)
 
@@ -26,7 +28,7 @@ Imagine you're coding. You take a coffee break. You come back and forget what yo
 2. **Dream**: Run `ds dream` in a corner of your screen. It just sits there. When you stop typing for a bit, it writes down what you did.
 3. **Chat**: Type `ds` whenever you want to talk to your code. Ask things like *"Where did I leave that API key?"* or *"What's next?"*
 
-### How to deal with errors ️
+### How to deal with errors 🛠️
 - **"Ollama not found"**: You need [Ollama](https://ollama.com/) running. It's the engine. Download it, run it, and try again.
 - **"Permission Denied"**: DeepSleep needs to write its memory file. Make sure you have permission to write in the current folder.
 - **"Stuck dreaming"**: If `ds dream` isn't doing anything, make sure you actually *saved* some files. It only dreams when things change!
