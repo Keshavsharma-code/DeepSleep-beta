@@ -14,18 +14,19 @@ def test_init_creates_memory_file(tmp_path: Path) -> None:
     assert payload["session"]["summary"] == "No session summary yet."
 
 
-def test_compactor_keeps_memory_under_2kb(tmp_path: Path) -> None:
+def test_compactor_keeps_memory_under_limit(tmp_path: Path) -> None:
     manager = MemoryManager(tmp_path)
     manager.initialize()
     memory = manager.load()
-    memory["project"]["summary"] = "project " * 200
-    memory["session"]["summary"] = "session " * 300
-    memory["project"]["goals"] = [f"goal-{index}-" + ("x" * 80) for index in range(10)]
-    memory["project"]["facts"] = [f"fact-{index}-" + ("y" * 80) for index in range(10)]
-    memory["session"]["recent_tasks"] = [f"task-{index}-" + ("z" * 80) for index in range(10)]
-    memory["session"]["recent_files"] = [f"folder/{index}/nested/path/file.py" for index in range(20)]
-    memory["ephemeral"]["recent_changes"] = [f"modified:file-{index}.py" for index in range(20)]
-    memory["ephemeral"]["open_questions"] = ["why " * 50 for _ in range(8)]
+    # Flood every field well beyond the 8KB limit
+    memory["project"]["summary"] = "project " * 800
+    memory["session"]["summary"] = "session " * 800
+    memory["project"]["goals"] = [f"goal-{i}-" + ("x" * 200) for i in range(30)]
+    memory["project"]["facts"] = [f"fact-{i}-" + ("y" * 200) for i in range(30)]
+    memory["session"]["recent_tasks"] = [f"task-{i}-" + ("z" * 200) for i in range(30)]
+    memory["session"]["recent_files"] = [f"folder/{i}/nested/path/file.py" for i in range(60)]
+    memory["ephemeral"]["recent_changes"] = [f"modified:file-{i}.py" for i in range(60)]
+    memory["ephemeral"]["open_questions"] = ["why " * 200 for _ in range(20)]
 
     compacted = manager.save(memory)
 
