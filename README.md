@@ -2,11 +2,10 @@
 
 # 🧠 DeepSleep
 
-### Your codebase has a memory now.
+### Your AI finally remembers you.
 
-*A zero-cost background agent that watches your files, dreams while you're away,*
-*answers "what was I working on?", and remembers patterns across every project you've ever touched.*
-*100% local. No cloud. No subscriptions.*
+*Watches your files. Dreams while you're away. Remembers patterns across every project you've ever touched.*
+*100% local. No cloud. No API key. No subscription. Just memory.*
 
 [![PyPI version](https://img.shields.io/pypi/v/deepsleep-ai.svg?style=flat-square&color=blueviolet)](https://pypi.org/project/deepsleep-ai/)
 [![Python versions](https://img.shields.io/pypi/pyversions/deepsleep-ai.svg?style=flat-square)](https://pypi.org/project/deepsleep-ai/)
@@ -31,25 +30,41 @@
 
 ---
 
-## The Problem
+## The problem with every AI coding tool right now
 
-You take a coffee break. You come back. You stare at the screen.
+You open Cursor. You open Claude. You open Copilot.
 
-**"Wait... what was I doing?"**
+And every single time, you have to **re-explain yourself.**
 
-But it gets worse. Three weeks later in a different project:
+> *"I'm working on a SaaS app, Python backend, the auth is broken, here's the context..."*
 
-**"I've solved this exact auth bug before. Where was it? Which repo?"**
+You've typed that paragraph 300 times. The AI has the memory of a goldfish. And it's not just annoying — it's actively making you slower.
 
-GitHub Copilot can't help. ChatGPT doesn't know your codebase. And `git log --all` across 12 repos is not a vibe.
+Then it gets worse. Three weeks later, different project:
 
-**DeepSleep fixes both.** It watches your files, dreams while you're idle, and builds a neural link across every project on your machine. Your AI knows what you were doing *and* what you've done before — everywhere.
+> *"I've fixed this exact JWT validation bug before. I know I have. Which repo was it in?"*
 
-> **No cloud. No tokens burned. No subscription. Just memory.**
+You dig through 12 repos. You grep across branches. You find nothing.
+
+**That's 40 minutes gone.** On a problem you already solved.
 
 ---
 
-## Evolution — What Each Version Does
+## DeepSleep fixes both. Permanently.
+
+```
+pip install deepsleep-ai && ds init && ds dream
+```
+
+That's it. DeepSleep now runs in the background. It watches your files. When you go idle, it dreams — reads what you touched, builds a summary, stores it locally. When you come back, it already knows what you were doing.
+
+And with **Neural Link** (v0.2.1), it connects every project on your machine into one searchable brain.
+
+> **No cloud. No tokens burned. No subscription. $0 forever.**
+
+---
+
+## Evolution — From Tool to Oracle
 
 ```mermaid
 timeline
@@ -74,7 +89,7 @@ timeline
 
 ## v0.1 — Project Memory
 
-> *"What was I working on in this project?"*
+> *"What was I working on?"* — answered in under a second, locally, for free.
 
 ```mermaid
 flowchart TD
@@ -98,7 +113,7 @@ flowchart TD
     style L fill:#14532d,color:#fff,stroke:#22c55e
 ```
 
-**3-layer memory stack — everything in one 8KB file:**
+**Everything lives in one 8KB file. Three layers. Always under budget.**
 
 ```mermaid
 block-beta
@@ -124,7 +139,9 @@ block-beta
 
 ## v0.2 — MCP Server
 
-> *"Open Cursor. Your AI already knows what you were doing."*
+> *Open Cursor. Your AI already knows what you were doing. You didn't have to type a single word.*
+
+This is what MCP unlocks. One JSON config block in your IDE. DeepSleep becomes a native memory layer — Cursor, Claude Desktop, and Windsurf can query it directly through the Model Context Protocol.
 
 ```mermaid
 flowchart LR
@@ -158,15 +175,19 @@ flowchart LR
     style Local fill:#14532d,color:#86efac,stroke:#22c55e
 ```
 
-One JSON config block in your IDE. Then your AI says:
+Your AI starts saying things like:
 
 > *"You were debugging the JWT middleware 3 hours ago. `auth.ts` and `middleware.py` were open. You were stuck on token validation."*
+
+Without you touching a thing.
 
 ---
 
 ## v0.2.1 — Neural Link
 
-> *"You solved this exact bug in `backend-api` two weeks ago. Want me to show you that snippet?"*
+> *You solved this exact bug in `backend-api` two weeks ago. Want me to show you that snippet?*
+
+Neural Link is the part that makes DeepSleep feel supernatural. It connects every project on your machine into one searchable, pattern-aware brain — backed by SQLite FTS5, zero cloud required.
 
 ```mermaid
 flowchart TD
@@ -208,7 +229,7 @@ flowchart TD
     style IDE fill:#1e3a5f,color:#93c5fd,stroke:#3b82f6
 ```
 
-**Pattern types DeepSleep recognises automatically:**
+**It classifies patterns automatically. No ML. Just fast keyword scoring.**
 
 ```mermaid
 mindmap
@@ -247,6 +268,8 @@ mindmap
 
 ## Security Architecture
 
+Your code never leaves the machine. Here's exactly what's sandboxed and how.
+
 ```mermaid
 flowchart LR
     subgraph SANDBOX["🛡️ Path Traversal Sandbox"]
@@ -274,7 +297,7 @@ flowchart LR
 
 ---
 
-## Why Local-First?
+## Why Local-First Wins
 
 ```mermaid
 graph LR
@@ -358,7 +381,7 @@ ds
 
 ### What is the Neural Link?
 
-The Neural Link indexes session memory from every DeepSleep-enabled project on your machine into a single SQLite FTS5 database at `~/.deepsleep/neural_link.db`. It powers cross-project search and pattern recognition.
+The Neural Link indexes session memory from every DeepSleep-enabled project on your machine into a single SQLite FTS5 database at `~/.deepsleep/neural_link.db`. It powers cross-project search and pattern recognition — your entire coding history, searchable in milliseconds.
 
 ```mermaid
 sequenceDiagram
@@ -688,8 +711,8 @@ pytest -v
 
 <div align="center">
 
-**If DeepSleep remembered something you forgot, give it a ⭐**
+**If DeepSleep remembered something you forgot — give it a ⭐**
 
-*Built for developers who forget things — which is all of us*
+*The AI that forgets nothing, costs nothing, and runs nowhere but your machine.*
 
 </div>
