@@ -590,6 +590,123 @@ def mcp(
     mcp_app.run(transport=transport)
 
 
+@app.command()
+def link(
+    path: Path = typer.Argument(Path("."), help="Project root to link into the Neural Link."),
+    sync: bool = typer.Option(True, "--sync/--no-sync", help="Immediately sync current memory after linking."),
+) -> None:
+    """Register this project in DeepSleep's Neural Link (cross-project memory).
+
+    After linking, DeepSleep can surface patterns from this project when you're
+    working in other projects:
+
+      "You solved this auth bug in backend-api two weeks ago."
+    """
+    from .neural_link import NeuralLink
+
+    project_root = path.resolve()
+    nl = NeuralLink()
+    info = nl.register_project(str(project_root))
+    typer.echo(f"Linked: {info['name']} ({project_root})")
+
+    if sync:
+        manager = _bootstrap(project_root)
+        memory = manager.load()
+        count = nl.sync_project(str(project_root), memory)
+        typer.echo(f"Synced {count} pattern(s) into Neural Link.")
+
+    stats = nl.get_stats()
+    typer.echo(f"Neural Link now tracks {stats['projects']} project(s), {stats['patterns']} pattern(s).")
+
+
+@app.command()
+def unlink(
+    path: Path = typer.Argument(Path("."), help="Project root to remove from Neural Link."),
+) -> None:
+    """Remove this project from the Neural Link index."""
+    from .neural_link import NeuralLink
+
+    project_root = path.resolve()
+    nl = NeuralLink()
+    removed = nl.unregister_project(str(project_root))
+    if removed:
+        typer.echo(f"Unlinked: {project_root.name}")
+    else:
+        typer.echo(f"{project_root.name} was not in the Neural Link.")
+
+
+@app.command()
+def search(
+    query: str = typer.Argument(..., help="What to search for across all linked projects."),
+    path: Path = typer.Option(Path("."), "--path", help="Current project root (excluded from results)."),
+    pattern_type: Optional[str] = typer.Option(
+        None, "--type", help="Filter by type: auth, bugfix, api, database, refactor, performance, test"
+    ),
+    limit: int = typer.Option(8, "--limit", help="Max results to return."),
+    format: str = typer.Option("text", "--format", help="text|json"),
+) -> None:
+    """Search your entire coding history across all linked projects.
+
+    Examples:
+
+      ds search "jwt token validation"
+      ds search "database migration" --type bugfix
+      ds search "auth middleware" --format json
+    """
+    import json as _json
+    from .neural_link import NeuralLink
+
+    nl = NeuralLink()
+    results = nl.search(
+        query,
+        limit=limit,
+        exclude_project=str(path.resolve()),
+        pattern_type=pattern_type,
+    )
+
+    if not results:
+        typer.echo(f"No cross-project matches for '{query}'.")
+        typer.echo("Tip: run `ds link` in your other projects to build the Neural Link index.")
+        return
+
+    if format == "json":
+        typer.echo(_json.dumps(results, indent=2, ensure_ascii=False))
+        return
+
+    typer.echo(f"\nNeural Link — {len(results)} result(s) for '{query}'\n")
+    for r in results:
+        ts = r["recorded_at"][:10]
+        src = f"  {r['source_file']}" if r["source_file"] else ""
+        typer.echo(f"  [{r['pattern_type'].upper()}] {r['project_name']} · {ts}{src}")
+        typer.echo(f"  {r['content'][:200]}")
+        typer.echo("")
+
+
+@app.command()
+def neural(
+    path: Path = typer.Argument(Path("."), help="Current project root."),
+    query: Optional[str] = typer.Option(None, "--query", "-q", help="Optional search query."),
+) -> None:
+    """Show the global Neural Link context — patterns from all linked projects.
+
+    Use --query to filter relevant results for your current task.
+    """
+    from .neural_link import NeuralLink
+
+    nl = NeuralLink()
+    stats = nl.get_stats()
+    if stats["projects"] == 0:
+        typer.echo("Neural Link is empty. Run `ds link` in your projects to get started.")
+        return
+
+    context = nl.get_global_context(
+        current_project=str(path.resolve()),
+        query=query,
+    )
+    typer.echo(context)
+    typer.echo(f"\n[{stats['projects']} projects · {stats['patterns']} patterns · {stats['db_path']}]")
+
+
 def main() -> None:
     app()
 

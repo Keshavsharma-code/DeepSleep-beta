@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.1 - 2026-04-18
+
+### Neural Link — Cross-Project Memory
+- add `neural_link.py` — SQLite FTS5 global index at `~/.deepsleep/neural_link.db`
+- index aggregates session summaries, file patterns, and task history from every linked project
+- automatic pattern classification into 8 types: auth, bugfix, api, database, refactor, performance, test, general
+- add `ds link` — register + sync project into Neural Link
+- add `ds unlink` — remove project from index
+- add `ds search "query"` — cross-project full-text search with `--type` and `--limit` filters
+- add `ds neural` — show global cross-project context with optional `--query` filter
+- add 5 Neural Link MCP tools: `cross_project_search`, `get_neural_context`, `get_similar_patterns`, `get_neural_link_stats`, `sync_to_neural_link`
+- fix deadlock in `NeuralLink.sync_project` — refactored lock-free internal registration
+- fix FTS5 unregister using `INSERT INTO patterns_fts VALUES ('rebuild')` instead of manual delete triggers
+- add 24 new tests for Neural Link (`tests/test_neural_link.py`) — all passing
+- add `tests/conftest.py` to silence structlog during test runs
+- bump version 0.2.0 → 0.2.1
+
 ## 0.2.0 - 2026-04-18
 
 ### MCP Server

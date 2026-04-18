@@ -290,6 +290,148 @@ def add_project_note(note: str, project_path: str = ".") -> str:
 
 
 # ---------------------------------------------------------------------------
+# Neural Link MCP tools — cross-project memory
+# ---------------------------------------------------------------------------
+
+
+@mcp_app.tool()
+def cross_project_search(
+    query: str,
+    project_path: str = ".",
+    limit: int = 8,
+    pattern_type: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Search your entire coding history across ALL linked DeepSleep projects.
+
+    This is the Neural Link — it surfaces patterns, solutions, and context from
+    every project on your machine.
+
+    Example questions it can answer:
+    - "Did I solve this auth bug before?" → cross_project_search("jwt token validation")
+    - "How did I handle database migrations?" → cross_project_search("migration rollback", pattern_type="database")
+    - "What auth patterns have I used?" → cross_project_search("auth middleware", pattern_type="auth")
+
+    Args:
+        query: Natural language search query.
+        project_path: Current project path (excluded from results so you only get cross-project hits).
+        limit: Maximum number of results (default 8).
+        pattern_type: Optional filter — auth, bugfix, api, database, refactor, performance, test.
+
+    Returns:
+        List of matching patterns with project_name, content, pattern_type, source_file, recorded_at.
+    """
+    try:
+        from .neural_link import NeuralLink
+        nl = NeuralLink()
+        return nl.search(
+            query,
+            limit=limit,
+            exclude_project=project_path,
+            pattern_type=pattern_type,
+        )
+    except Exception as exc:
+        logger.error("mcp_cross_project_search_failed", error=str(exc))
+        return []
+
+
+@mcp_app.tool()
+def get_neural_context(
+    project_path: str = ".",
+    query: Optional[str] = None,
+) -> str:
+    """Get full cross-project context from all linked DeepSleep projects.
+
+    Call this alongside get_context to give the AI a machine-wide view of
+    the developer's coding patterns, not just the current project.
+
+    Args:
+        project_path: Current project root (excluded from results).
+        query: Optional query to filter relevant cross-project patterns.
+
+    Returns:
+        A formatted context string covering all linked projects.
+    """
+    try:
+        from .neural_link import NeuralLink
+        nl = NeuralLink()
+        return nl.get_global_context(current_project=project_path, query=query)
+    except Exception as exc:
+        return f"[Neural Link] Unavailable: {exc}"
+
+
+@mcp_app.tool()
+def get_similar_patterns(
+    pattern_type: str,
+    project_path: str = ".",
+    limit: int = 6,
+) -> List[Dict[str, Any]]:
+    """Find recent patterns of a specific type from other linked projects.
+
+    Great for when the AI recognises what kind of problem the developer is
+    solving and wants to surface prior solutions automatically.
+
+    Args:
+        pattern_type: One of: auth, bugfix, api, database, refactor, performance, test, general.
+        project_path: Current project (excluded from results).
+        limit: Max results.
+
+    Returns:
+        List of matching patterns with project context.
+    """
+    try:
+        from .neural_link import NeuralLink
+        nl = NeuralLink()
+        return nl.find_similar_patterns(
+            pattern_type=pattern_type,
+            exclude_project=project_path,
+            limit=limit,
+        )
+    except Exception as exc:
+        logger.error("mcp_similar_patterns_failed", error=str(exc))
+        return []
+
+
+@mcp_app.tool()
+def get_neural_link_stats() -> Dict[str, Any]:
+    """Return Neural Link index statistics — how many projects, snapshots, and patterns are indexed.
+
+    Returns:
+        Dict with projects, snapshots, patterns counts and db_path.
+    """
+    try:
+        from .neural_link import NeuralLink
+        nl = NeuralLink()
+        return nl.get_stats()
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+@mcp_app.tool()
+def sync_to_neural_link(project_path: str = ".") -> str:
+    """Push the current project's memory into the global Neural Link index.
+
+    Call this after a dream cycle or when you want to make the current
+    session available to cross-project searches.
+
+    Args:
+        project_path: Absolute or relative path to the project root.
+
+    Returns:
+        Confirmation with number of patterns indexed.
+    """
+    try:
+        from .neural_link import NeuralLink
+        manager = _get_manager(project_path)
+        memory = manager.load()
+        nl = NeuralLink()
+        count = nl.sync_project(project_path, memory)
+        stats = nl.get_stats()
+        return f"Synced {count} pattern(s) from {Path(project_path).resolve().name}. Neural Link total: {stats['patterns']} patterns across {stats['projects']} projects."
+    except Exception as exc:
+        return f"[Neural Link] Sync failed: {exc}"
+
+
+# ---------------------------------------------------------------------------
 # Resources — expose memory as readable MCP resources
 # ---------------------------------------------------------------------------
 
