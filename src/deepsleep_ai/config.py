@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class MemoryConfig(BaseSettings):
-    max_bytes: int = 2048
-    compression_level: str = "aggressive"  # conservative | aggressive | strict
+    max_bytes: int = 8192  # 8KB — enough to hold rich session context without aggressive loss
+    compression_level: str = "conservative"  # conservative | aggressive | strict
 
 
 class WatchConfig(BaseSettings):
@@ -23,7 +22,7 @@ class WatchConfig(BaseSettings):
 class LLMConfig(BaseSettings):
     default_model: str = "deepseek-r1"
     timeout: int = 120
-    max_context_files: int = 3
+    max_context_files: int = 5  # was 3 — allows richer file context per query
     fallback_on_timeout: bool = True
 
 

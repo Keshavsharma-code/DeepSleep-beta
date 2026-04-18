@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "deepsleep-ai"
-version = "0.1.0"
-description = "Zero-cost background coding agent with layered memory, idle-time dreaming, and Ollama support."
+version = "0.2.0"
+description = "Zero-cost background coding agent with layered memory, idle-time dreaming, MCP server, and Ollama support."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -25,7 +25,11 @@ keywords = [
   "developer-tools",
   "local-ai",
   "local-llm",
-  "terminal-ai"
+  "terminal-ai",
+  "mcp",
+  "model-context-protocol",
+  "cursor",
+  "windsurf"
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -52,8 +56,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+mcp = [
+  "mcp>=1.0"
+]
 dev = [
-  "pytest>=8.0,<9.0"
+  "pytest>=8.0,<9.0",
+  "mcp>=1.0"
 ]
 
 [project.urls]
@@ -64,6 +72,7 @@ Changelog = "https://github.com/Keshavsharma-code/DeepSleep-beta/releases"
 
 [project.scripts]
 ds = "deepsleep_ai.cli:main"
+deepsleep-mcp = "deepsleep_ai.mcp_server:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

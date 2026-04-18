@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import os
 import shutil
 import html
 import base64
@@ -11,7 +10,7 @@ from typing import List, Optional
 import typer
 import structlog
 from prompt_toolkit import HTML, PromptSession, print_formatted_text
-from prompt_toolkit.completion import Completer, Completion, PathCompleter, WordCompleter
+from prompt_toolkit.completion import Completer, PathCompleter, WordCompleter
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.styles import Style
 
@@ -137,7 +136,7 @@ def _collect_file_context(project_root: Path, question: str, memory_manager: Mem
     for file_path in file_candidates:
         if file_path not in deduped:
             deduped.append(file_path)
-    return deduped[:3]
+    return deduped[:5]
 
 
 def _render_file_context(project_root: Path, relative_paths: List[str]) -> str:
@@ -150,13 +149,22 @@ def _render_file_context(project_root: Path, relative_paths: List[str]) -> str:
             continue
         
         # Sanitize for prompt
-        sanitized = html.escape(content[:1800])
+        sanitized = html.escape(content[:4000])
         blocks.append(f"---BEGIN_FILE: {relative_path}---\n{sanitized}\n---END_FILE---")
     return "\n\n".join(blocks)
 
 
+OLLAMA_INSTALL_HINT = (
+    "Ollama is not running or not installed.\n"
+    "  Install : https://ollama.com/download\n"
+    "  Start   : ollama serve\n"
+    "  Pull    : ollama pull deepseek-r1\n"
+    "DeepSleep will answer from saved local memory until Ollama is available."
+)
+
+
 def _print_banner(project_root: Path, client: OllamaClient) -> None:
-    availability = "online" if client.is_available() else "offline"
+    availability = "online" if client.is_available() else "offline (run: ollama serve)"
     print_formatted_text(
         HTML(
             "<brand>DeepSleep</brand> "
@@ -224,6 +232,8 @@ def chat_loop(project_root: Path, model: str, host: str, password: Optional[str]
     )
 
     _print_banner(project_root, client)
+    if not client.is_available():
+        typer.echo(OLLAMA_INSTALL_HINT)
 
     while True:
         try:
@@ -265,7 +275,7 @@ def default_chat(
     model: str = typer.Option("deepseek-r1", "--model", help="Ollama model name."),
     host: str = typer.Option("http://127.0.0.1:11434", "--host", help="Ollama host."),
     password: Optional[str] = typer.Option(None, "--password", "-p", help="Password for encrypted memory."),
-    version: bool = typer.Option(
+    _version: bool = typer.Option(
         False,
         "--version",
         callback=_version_callback,
@@ -274,8 +284,6 @@ def default_chat(
     ),
 ) -> None:
     """Start interactive chat when no subcommand is passed."""
-
-    _ = version
 
     if ctx.invoked_subcommand is None:
         chat_loop(path.resolve(), model, host, password=password)
@@ -542,6 +550,44 @@ def export(
         typer.echo(f"Report saved to {out}")
     else:
         typer.echo(output)
+
+
+@app.command()
+def mcp(
+    path: Path = typer.Argument(Path("."), help="Project root to serve memory for."),
+    transport: str = typer.Option("stdio", "--transport", help="Transport: stdio (default)."),
+) -> None:
+    """Start the DeepSleep MCP server for Cursor, Claude Desktop, Windsurf, and other AI IDEs.
+
+    Add to your IDE's MCP config:
+
+      {
+        "mcpServers": {
+          "deepsleep": {
+            "command": "deepsleep-mcp",
+            "args": ["--path", "/absolute/path/to/your/project"]
+          }
+        }
+      }
+    """
+    try:
+        from .mcp_server import mcp_app, _get_manager
+    except ImportError:
+        typer.echo(
+            "The MCP server requires the 'mcp' package.\n"
+            "Install it with: pip install 'deepsleep-ai[mcp]'",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    project_root = path.resolve()
+    try:
+        _get_manager(str(project_root))
+        typer.echo(f"DeepSleep MCP server starting for {project_root} (transport={transport})", err=True)
+    except Exception as exc:
+        typer.echo(f"Warning: could not pre-warm memory: {exc}", err=True)
+
+    mcp_app.run(transport=transport)
 
 
 def main() -> None:

@@ -35,7 +35,7 @@ class FileIndex:
     db_path: Path
     
     def __post_init__(self) -> None:
-        self.conn = sqlite3.connect(str(self.db_path))
+        self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS files (
                 path TEXT PRIMARY KEY,
@@ -243,6 +243,8 @@ class DreamWatcher:
     def _to_relative(self, file_path: str) -> Optional[str]:
         try:
             path = Path(file_path).resolve()
-            return str(path.relative_to(self.project_root))
+            relative = path.relative_to(self.project_root)
+            # Normalise to forward slashes on all platforms (including Windows)
+            return relative.as_posix()
         except (ValueError, RuntimeError):
             return None

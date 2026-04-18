@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import json
-import hashlib
 import base64
 import os
 from datetime import datetime, timezone
@@ -19,8 +18,8 @@ from .config import DeepSleepConfig
 
 logger = structlog.get_logger()
 
-MAX_MEMORY_BYTES = 2048
-ENC_MAGIC = "DS_V1_ENC:" # Magic header for encrypted files
+MAX_MEMORY_BYTES = 8192  # 8KB default — overridden by config
+ENC_MAGIC = "DS_V1_ENC:"  # Magic header for encrypted files
 
 
 def utc_now() -> str:
@@ -159,7 +158,7 @@ class MemoryManager:
         memory["ephemeral"]["recent_changes"] = self._append_unique(
             memory["ephemeral"]["recent_changes"],
             labeled,
-            limit=8,
+            limit=15,
         )
         self.log_event(
             "file_event",
@@ -180,11 +179,11 @@ class MemoryManager:
         files = files or []
         memory["ephemeral"]["last_user_message"] = self._clip(user_message, 180)
         memory["ephemeral"]["last_assistant_message"] = self._clip(assistant_message, 220)
-        memory["session"]["recent_files"] = self._merge_paths(memory["session"]["recent_files"], files, 6)
+        memory["session"]["recent_files"] = self._merge_paths(memory["session"]["recent_files"], files, 12)
         memory["session"]["recent_tasks"] = self._append_unique(
             memory["session"]["recent_tasks"],
-            self._clip(user_message, 140),
-            limit=5,
+            self._clip(user_message, 200),
+            limit=10,
         )
         self.log_event(
             "chat_turn",
@@ -203,15 +202,15 @@ class MemoryManager:
         model_name: str,
     ) -> Dict[str, Any]:
         memory = self.load()
-        memory["session"]["summary"] = self._clip(summary, 420)
+        memory["session"]["summary"] = self._clip(summary, 1200)
         memory["session"]["recent_files"] = self._merge_paths(
             memory["session"]["recent_files"],
             changed_files,
-            8,
+            15,
         )
         memory["session"]["last_dream_at"] = utc_now()
         memory["ephemeral"]["recent_changes"] = [
-            self._clip(change, 140) for change in changed_files[-8:]
+            self._clip(change, 200) for change in changed_files[-15:]
         ]
         memory["meta"]["last_model"] = model_name
         self.log_event(
@@ -253,37 +252,37 @@ class MemoryManager:
     def _compact(self, memory: Dict[str, Any]) -> Dict[str, Any]:
         compacted = copy.deepcopy(memory)
 
-        compacted["project"]["summary"] = self._clip(compacted["project"]["summary"], 260)
-        compacted["session"]["summary"] = self._clip(compacted["session"]["summary"], 420)
+        compacted["project"]["summary"] = self._clip(compacted["project"]["summary"], 800)
+        compacted["session"]["summary"] = self._clip(compacted["session"]["summary"], 1200)
         compacted["ephemeral"]["last_user_message"] = self._clip(
             compacted["ephemeral"]["last_user_message"],
-            180,
+            400,
         )
         compacted["ephemeral"]["last_assistant_message"] = self._clip(
             compacted["ephemeral"]["last_assistant_message"],
-            220,
+            600,
         )
-        compacted["project"]["goals"] = self._normalize_list(compacted["project"]["goals"], 4, 90)
-        compacted["project"]["facts"] = self._normalize_list(compacted["project"]["facts"], 5, 90)
+        compacted["project"]["goals"] = self._normalize_list(compacted["project"]["goals"], 8, 160)
+        compacted["project"]["facts"] = self._normalize_list(compacted["project"]["facts"], 10, 160)
         compacted["session"]["recent_files"] = self._normalize_list(
             compacted["session"]["recent_files"],
-            8,
-            80,
+            15,
+            120,
         )
         compacted["session"]["recent_tasks"] = self._normalize_list(
             compacted["session"]["recent_tasks"],
-            5,
-            120,
+            10,
+            200,
         )
         compacted["ephemeral"]["open_questions"] = self._normalize_list(
             compacted["ephemeral"]["open_questions"],
-            4,
-            120,
+            8,
+            200,
         )
         compacted["ephemeral"]["recent_changes"] = self._normalize_list(
             compacted["ephemeral"]["recent_changes"],
-            8,
-            120,
+            15,
+            200,
         )
         compacted["meta"]["compacted"] = False
 
@@ -291,10 +290,10 @@ class MemoryManager:
             lambda value: self._trim_list(value, ("ephemeral", "recent_changes")),
             lambda value: self._trim_list(value, ("session", "recent_tasks")),
             lambda value: self._trim_list(value, ("project", "facts")),
-            lambda value: self._trim_string(value, ("ephemeral", "last_assistant_message"), 120),
-            lambda value: self._trim_string(value, ("session", "summary"), 260),
+            lambda value: self._trim_string(value, ("ephemeral", "last_assistant_message"), 300),
+            lambda value: self._trim_string(value, ("session", "summary"), 600),
             lambda value: self._trim_list(value, ("session", "recent_files")),
-            lambda value: self._trim_string(value, ("project", "summary"), 160),
+            lambda value: self._trim_string(value, ("project", "summary"), 400),
             lambda value: self._clear_list(value, ("ephemeral", "open_questions")),
         ]
 
@@ -372,8 +371,8 @@ class MemoryManager:
         try:
             path = Path(value)
             if path.is_absolute():
-                return str(path.relative_to(self.project_root))
-            return str(path)
+                return Path(value).resolve().relative_to(self.project_root).as_posix()
+            return Path(value).as_posix()
         except Exception:
             return str(value)
 
